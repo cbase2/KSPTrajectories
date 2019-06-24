@@ -242,7 +242,12 @@ namespace Trajectories
 
         public List<Patch> Patches { get { return patches_; } }
 
-        public void InvalidateCalculation() { patches_.Clear(); maxAccel_ = 0; }
+        public void InvalidateCalculation()
+        {
+            patches_.Clear();  patchesBackBuffer_.Clear();
+            maxAccel_ = maxAccelBackBuffer_ = 0;
+            if (partialComputation_ != null) { partialComputation_.Dispose(); partialComputation_ = null; }
+        }
 
         private Stopwatch incrementTime_;
 
