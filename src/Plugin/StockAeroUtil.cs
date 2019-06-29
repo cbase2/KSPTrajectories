@@ -156,6 +156,8 @@ namespace Trajectories
             double soundSpeed = body.GetSpeedOfSound(pressure, rho);
             double mach = v_wrld_vel.magnitude / soundSpeed;
             if (mach > 25.0) { mach = 25.0; }
+            float pseudoreynolds = (float)(rho * v_wrld_vel.magnitude);
+            float pseudoredragmult = PhysicsGlobals.DragCurvePseudoReynolds.Evaluate(pseudoreynolds);
 
             // Loop through all parts, accumulating drag and lift.
             for (int i = 0; i < _vessel.Parts.Count; ++i)
@@ -213,8 +215,6 @@ namespace Trajectories
                                 //Debug.Log(String.Format("Trajectories: Caught NRE on Drag Initialization.  Should be fixed now.  {0}", e));
                             }
 
-                            float pseudoreynolds = (float)(rho * Mathf.Abs(v_wrld_vel.magnitude));
-                            float pseudoredragmult = PhysicsGlobals.DragCurvePseudoReynolds.Evaluate(pseudoreynolds);
                             drag = p_drag_data.areaDrag * PhysicsGlobals.DragCubeMultiplier * pseudoredragmult;
 
                             liftForce = p_drag_data.liftForce;
