@@ -136,7 +136,9 @@ namespace Trajectories
             //if (VesselAerodynamicModel.DebugParts)
                // Debug.Log("alt: " + altitude + " vel: " + (toLocal * v_wrld_vel.normalized).ToString("F1") );
 
-            FieldInfo mcsCtrlSurfacefield = typeof(ModuleControlSurface).GetField("ctrlSurface", BindingFlags.Instance | BindingFlags.NonPublic);
+            //FieldInfo mcsCtrlSurfacefield = typeof(ModuleControlSurface).GetField("ctrlSurface", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo mcsAirflowIncidencefield = typeof(ModuleControlSurface).GetField("airflowIncidence", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo mcsDeflectionfield = typeof(ModuleControlSurface).GetField("deflection", BindingFlags.Instance | BindingFlags.NonPublic);
 
             CelestialBody body = _vessel.mainBody;
             double pressure = body.GetPressure(altitude);
@@ -158,6 +160,7 @@ namespace Trajectories
             if (mach > 25.0) { mach = 25.0; }
             float pseudoreynolds = (float)(rho * v_wrld_vel.magnitude);
             float pseudoredragmult = PhysicsGlobals.DragCurvePseudoReynolds.Evaluate(pseudoreynolds);
+            float liftQ = (float)dyn_pressure * 1000;
 
             // Loop through all parts, accumulating drag and lift.
             for (int i = 0; i < _vessel.Parts.Count; ++i)
@@ -165,7 +168,6 @@ namespace Trajectories
                 // need checks on shielded components
                 Part p = _vessel.Parts[i];
 #if DEBUG
-
                 TrajectoriesDebug partDebug = VesselAerodynamicModel.DebugParts ? p.FindModuleImplementing<TrajectoriesDebug>() : null;
                 if (partDebug != null)
                 {
@@ -250,7 +252,7 @@ namespace Trajectories
                 {
                     partDebug.Drag += dragForce;
                 }
-                #endif
+#endif
                 total_drag += dragForce;
 
                 // If it isn't a wing or lifter, get body lift.
@@ -273,57 +275,40 @@ namespace Trajectories
 
                     Profiler.Stop("SimAeroForce#BodyLift");
                 }
-
-
-                Profiler.Start("SimAeroForce#LiftingSurface");
-
-                // Find ModuleLifingSurface for wings and liftforce.
-                // Should catch control surface as it is a subclass
-                for (int j = 0; j < p.Modules.Count; ++j)
+                else
                 {
-                    var m = p.Modules[j];
-                    float mcs_mod = 0f;
-                    //Quaternion mcs_rot = Quaternion.identity;
-                    Vector3 mcs_up = Vector3.zero;
-                    if (m is ModuleLiftingSurface)
-                    {
 
-                        float liftQ = (float) dyn_pressure * 1000;
-                        ModuleLiftingSurface wing = (ModuleLiftingSurface)m;
+                    Profiler.Start("SimAeroForce#LiftingSurface");
+
+                    // loop over ModuleLifingSurface for wings and liftforce.
+                    // will catch control surface as it is a subclass
+                    foreach (var wing in p.FindModulesImplementing<ModuleLiftingSurface>())
+                    {
+                        float mcs_mod = 0f;
+
                         if (wing is ModuleControlSurface)
                         {
                             mcs_mod = (wing as ModuleControlSurface).ctrlSurfaceArea;
-                            // use reflections to access protected field ctrlSurface
-                            mcs_up = (mcsCtrlSurfacefield.GetValue(wing as ModuleControlSurface) as Transform).forward;
-                            
                         }
 
                         Vector3 liftVector = wing.transformSign * p.transform.forward;
                         float liftdot = Vector3.Dot(sim_dragVectorDir, liftVector);
                         float absdot = Mathf.Abs(liftdot);
-                        //wing.SetupCoefficients(v_wrld_vel, out nVel, out liftVector, out liftdot, out absdot);
-
-                        //double prevMach = p.machNumber;
-                        //p.machNumber = mach;
 
                         // fixed wing proportion for control surfaces
                         Vector3 local_lift = (1.0f - mcs_mod) * Mathf.Sign(liftdot)
-                                                              * wing.liftCurve.Evaluate(absdot)
-                                                              * wing.liftMachCurve.Evaluate((float)mach)
-                                                              * wing.deflectionLiftCoeff
-                                                              * liftQ * PhysicsGlobals.LiftMultiplier
-                                                              * -liftVector;
+                                                                * wing.liftCurve.Evaluate(absdot)
+                                                                * wing.liftMachCurve.Evaluate((float)mach)
+                                                                * wing.deflectionLiftCoeff
+                                                                * liftQ * PhysicsGlobals.LiftMultiplier
+                                                                * -liftVector;
 
                         //(wing.GetLiftVector(liftVector, liftdot, absdot, liftQ, (float)mach));
                         Vector3 local_drag = (1.0f - mcs_mod) * wing.dragCurve.Evaluate(absdot)
-                                                              * wing.dragMachCurve.Evaluate((float)mach)
-                                                              * wing.deflectionLiftCoeff
-                                                              * liftQ * PhysicsGlobals.LiftDragMultiplier
-                                                              * -sim_dragVectorDir;
-
-
-                            //(wing.GetDragVector(nVel, absdot, liftQ));
-
+                                                                * wing.dragMachCurve.Evaluate((float)mach)
+                                                                * wing.deflectionLiftCoeff
+                                                                * liftQ * PhysicsGlobals.LiftDragMultiplier
+                                                                * -sim_dragVectorDir;
                         total_lift += local_lift;
                         total_drag += local_drag;
 #if DEBUG
@@ -336,22 +321,30 @@ namespace Trajectories
 
                         if (wing is ModuleControlSurface)
                         {
-                            liftVector = wing.transformSign * mcs_up;
+                            // use reflections to access protected fields
+                            bool mcs_neutral = (Mathf.Abs((float)mcsDeflectionfield.GetValue(wing as ModuleControlSurface)) <= 0.01);
+
+                            if (!mcs_neutral)
+                            {
+                                Quaternion mcs_rot = (Quaternion)mcsAirflowIncidencefield.GetValue(wing as ModuleControlSurface);
+                                liftVector = mcs_rot * liftVector;
+                            }
+
                             liftdot = Vector3.Dot(sim_dragVectorDir, liftVector);
                             absdot = Mathf.Abs(liftdot);
-                            
+
                             local_lift = mcs_mod * Mathf.Sign(liftdot)
-                                                 * wing.liftCurve.Evaluate(absdot)
-                                                 * wing.liftMachCurve.Evaluate((float)mach)
-                                                 * wing.deflectionLiftCoeff
-                                                 * liftQ * PhysicsGlobals.LiftMultiplier
-                                                 * -liftVector;
+                                                    * wing.liftCurve.Evaluate(absdot)
+                                                    * wing.liftMachCurve.Evaluate((float)mach)
+                                                    * wing.deflectionLiftCoeff
+                                                    * liftQ * PhysicsGlobals.LiftMultiplier
+                                                    * -liftVector;
 
                             local_drag = mcs_mod * wing.dragCurve.Evaluate(absdot)
-                                                 * wing.dragMachCurve.Evaluate((float)mach)
-                                                 * wing.deflectionLiftCoeff
-                                                 * liftQ * PhysicsGlobals.LiftDragMultiplier
-                                                 * -sim_dragVectorDir;
+                                                    * wing.dragMachCurve.Evaluate((float)mach)
+                                                    * wing.deflectionLiftCoeff
+                                                    * liftQ * PhysicsGlobals.LiftDragMultiplier
+                                                    * -sim_dragVectorDir;
 
                             total_lift += local_lift;
                             total_drag += local_drag;
@@ -360,17 +353,13 @@ namespace Trajectories
                             {
                                 partDebug.Lift += local_lift;
                                 partDebug.Drag += local_drag;
-                               // Debug.Log(String.Format("Traj Part MCS: localLift={0:F1}, local nVel={1:F1}, liftVector={2:F1}, liftdot={3:F1}, absDot={4:F1}", toLocal * local_lift, toLocal * sim_dragVectorDir, toLocal * liftVector, liftdot, absdot));
                             }
 #endif
                         }
-                        //p.machNumber = prevMach;
-
                     }
+
+                    Profiler.Stop("SimAeroForce#LiftingSurface");
                 }
-
-                Profiler.Stop("SimAeroForce#LiftingSurface");
-
             }
             // RETURN STUFF
             Vector3 force = total_lift + total_drag;
