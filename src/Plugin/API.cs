@@ -329,6 +329,7 @@ namespace Trajectories
                             conf.Value.higher.Angle = newvalue;
                             if ((altitudeRatio - conf.Key)*conf.Value.transition < 1)
                                 conf.Value.lower.Angle = newvalue;
+                            //break;
                         }
                     }
 

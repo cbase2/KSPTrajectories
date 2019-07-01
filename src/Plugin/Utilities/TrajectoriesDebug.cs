@@ -25,10 +25,10 @@ namespace Trajectories
 #if DEBUG
     public class TrajectoriesDebug : PartModule
     {
-        [KSPField(isPersistant = false, guiActive = true, guiFormat = "F1")]
+        [KSPField(isPersistant = false, guiActive = true, guiFormat = "F1",guiName = "Traj Drag")]
         public Vector3 Drag;
 
-        [KSPField(isPersistant = false, guiActive = true, guiFormat = "F1")]
+        [KSPField(isPersistant = false, guiActive = true, guiFormat = "F1", guiName = "Traj Lift")]
         public Vector3 Lift;
 
     }
