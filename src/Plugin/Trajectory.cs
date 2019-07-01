@@ -383,10 +383,8 @@ namespace Trajectories
                     Transform vesselTransform = attachedVessel.ReferenceTransform;
 
                     Quaternion velocityRotation = Quaternion.LookRotation(-bodySpacePosition, airVelocity).Inverse();
-                    
-                    double AoA = Math.Acos(Vector3d.Dot(airVelocity.normalized, vesselTransform.up));
-                    if (Vector3d.Dot(airVelocity, vesselTransform.forward) < 0)
-                        AoA = -AoA;
+
+                    double AoA = Vector3.SignedAngle(vesselTransform.up, airVelocity, vesselTransform.right);
                     VesselAerodynamicModel.DebugParts = true;
                     Vector3d predictedForce = aerodynamicModel_.ComputeForces( altitudeAboveSea, airVelocity, bodySpacePosition, AoA, applyScale: false );
                     VesselAerodynamicModel.DebugParts = false;
@@ -396,16 +394,16 @@ namespace Trajectories
 
                     Vector3 localActualForce = velocityRotation * ActualForce;
                     Vector3 localPredictedForce = velocityRotation * predictedForce;
-                    bool idleFlight = attachedVessel.ctrlState.mainThrottle == 0
+                    /*bool idleFlight = attachedVessel.ctrlState.mainThrottle == 0
                                         && attachedVessel.FindPartModulesImplementing<ModuleRCS>().Any(p => !p.rcs_active);
 
                     if (altitudeAboveSea < body.atmosphereDepth && idleFlight )
                     {
                         Vector3d newScale = Vector3d.one;
-                        //clamp correction factor depending on altitude: 1 at entry, between 0 and 2 at ground
+                        //clamp correction factor depending on altitude: 1 at entry, and +-10% at half altitude
                         //this allows for better adaption close to ground while being stable at high altitudes
-                        double min = altitudeAboveSea / body.atmosphereDepth;
-                        double max = 2 - min;
+                        double min = Util.dLerp(1d, 0.9d, 1d * altitudeAboveSea / body.atmosphereDepth);
+                        double max = Util.dLerp(1d, 1.1d, 1d * altitudeAboveSea / body.atmosphereDepth);
 
                         if (Math.Abs(localPredictedForce.x) > 0.1 )
                             newScale.x = Util.Clamp(localActualForce.x / localPredictedForce.x, min, max);
@@ -422,7 +420,7 @@ namespace Trajectories
                     {
                         Settings.fetch.GlobalCorrectionFactor = Vector3d.one;
                         //UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
-                    }
+                    }*/
 #if DEBUG && DEBUG_TELEMETRY
                     Trajectories.Telemetry.Send("ut", now);
                     Trajectories.Telemetry.Send("altitude", attachedVessel.altitude);
