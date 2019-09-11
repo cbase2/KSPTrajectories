@@ -107,6 +107,14 @@ namespace Trajectories
                 return Math.Acos(Vector3d.Dot(position, velocity) / (position.magnitude * velocity.magnitude)) - Math.PI * 0.5 + Angle;
             }
 
+            public double GetAngleOfAttack(double AoS)
+            {
+                if (!Horizon)
+                    return Angle;
+                else
+                    return AoS + Angle;
+            }
+
             [Obsolete("use MainGUI")]
             public void DoGUI()
             {
@@ -171,9 +179,9 @@ namespace Trajectories
             // stores connection between the different settings
             NodeList = new SortedList<double, (Node higher, Node lower, double transition)>(new revSort())
             {
-                { 0.5,  (entry,        highAltitude,  10) },
-                { 0.25, (highAltitude, lowAltitude,   10) },
-                { 0.0,  (lowAltitude,  finalApproach, 10) }
+                { 0.55, (entry,        highAltitude,  40) }, // 0.55+1/40=0.575 -> 0.55 is transition interval
+                { 0.25, (highAltitude, lowAltitude,   20) }, // 0.25+1/20=0.3 -> 0.25
+                { 0.05, (lowAltitude,  finalApproach, 20) }  // 0.05+1/20=0.1 -> 0.05
             };
         }
 
@@ -361,7 +369,7 @@ namespace Trajectories
         /// Computes the orientation Quaternion for API (intended for MechJeb).
         /// Note: we are using Unity directions, not KSP swapped forward/up stuff
         /// </summary>
-        public Quaternion GetRealOrientation(CelestialBody body, Vector3d position, Vector3d velocity)
+        public Quaternion GetUnityOrientation(CelestialBody body, Vector3d position, Vector3d velocity)
         {
             if (ProgradeEntry)
             {
@@ -371,6 +379,22 @@ namespace Trajectories
             {
                 //retrograde is actually 180° rotation around Vesselup to keep orientation and then pitch for remaining AoA, not pitch by nearly 180°
                 return Quaternion.AngleAxis((float) GetAngleOfAttack(body, position, velocity) * Mathf.Rad2Deg - 180f, Vector3.right) * Quaternion.AngleAxis(180f, Vector3.up);
+            }
+        }
+
+        /// <summary>
+        /// Computes the orientation Quaternion for rotations in ksp coordinates (flying up instead of forward)
+        /// </summary>
+        public Quaternion GetKspOrientation(CelestialBody body, Vector3d position, Vector3d velocity)
+        {
+            if (ProgradeEntry)
+            {
+                return Quaternion.AngleAxis((float)GetAngleOfAttack(body, position, velocity) * Mathf.Rad2Deg, Vector3.right);
+            }
+            else
+            {
+                //retrograde is actually 180° rotation around Vesselup to keep orientation and then pitch for remaining AoA, not pitch by nearly 180°
+                return Quaternion.AngleAxis((float)GetAngleOfAttack(body, position, velocity) * Mathf.Rad2Deg - 180f, Vector3.right) * Quaternion.AngleAxis(180f, Vector3.forward);
             }
         }
     }

@@ -203,7 +203,7 @@ namespace Trajectories
 
                 Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
                 Vector3d vel = FlightGlobals.ActiveVessel.obt_velocity - Trajectory.Target.Body.getRFrmVel(Trajectory.Target.Body.position + pos);
-                return DescentProfile.fetch.GetRealOrientation(Trajectory.Target.Body, pos, vel);
+                return DescentProfile.fetch.GetUnityOrientation(Trajectory.Target.Body, pos, vel);
             }
             else
                 return null;
@@ -287,10 +287,55 @@ namespace Trajectories
         }
 
         /// <summary>
-        /// provide read/write access to current or next angle except for entry
-        /// due to thin air the entry phase is not efficient to control target, so we ignore it
+        /// provide read/write access to current effective angle of attack
+        /// if set during transition then both angles are changed
         /// </summary>
-        public static double? AirAngle
+        public static double? AoA
+        {
+            get
+            {
+                if (FlightGlobals.ActiveVessel != null && Trajectory.Target.Body != null)
+                {
+                    Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
+                    Vector3d vel = FlightGlobals.ActiveVessel.obt_velocity - Trajectory.Target.Body.getRFrmVel(Trajectory.Target.Body.position + pos);
+                    return Mathf.Rad2Deg * DescentProfile.fetch.GetAngleOfAttack(Trajectory.Target.Body, pos, vel);                    
+                }
+
+                return null;
+            }
+            set
+            {
+                if (value.HasValue && FlightGlobals.ActiveVessel != null && Trajectory.Target.Body != null)
+                {
+                    double newvalue = Mathf.Deg2Rad * (double)value;
+                    Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
+                    Vector3d vel = FlightGlobals.ActiveVessel.obt_velocity - Trajectory.Target.Body.getRFrmVel(Trajectory.Target.Body.position + pos);
+                    double altitude = pos.magnitude - Trajectory.Target.Body.Radius;
+                    double altitudeRatio = Trajectory.Target.Body.atmosphere ? altitude / Trajectory.Target.Body.atmosphereDepth : 0;
+
+                    foreach (var conf in DescentProfile.fetch.NodeList)
+                    {
+                        if (conf.Key <= altitudeRatio)
+                        {
+                            double factor = (altitudeRatio - conf.Key) * conf.Value.transition;
+                            double delta = newvalue - Util.dLerp(conf.Value.lower.GetAngleOfAttack(pos, vel), conf.Value.higher.GetAngleOfAttack(pos, vel), factor );
+                            Debug.Log("Traj API: newangle for "+ conf.Value.higher.Name +" with delta " + (Mathf.Rad2Deg * delta).ToString("F1")+" gives " + (Mathf.Rad2Deg * (conf.Value.higher.Angle + delta)).ToString("F1"));
+                            conf.Value.higher.Angle += delta;
+                            if (factor < 1)
+                                conf.Value.lower.Angle += delta;
+                            break;
+                        }
+                    }
+
+                }
+            }
+        }
+
+        /// <summary>
+        /// provide read/write access to next configured angle
+        /// ignores transition phases
+        /// </summary>
+        public static double? nextAoA
         {
             get
             {
@@ -303,12 +348,12 @@ namespace Trajectories
 
                     foreach (var conf in DescentProfile.fetch.NodeList)
                     {
-                        if (conf.Key <= altitudeRatio && conf.Value.higher != DescentProfile.fetch.entry)
-                            return Mathf.Rad2Deg * Util.dLerp(conf.Value.lower.GetAngleOfAttack(pos, vel),
-                                                              conf.Value.higher.GetAngleOfAttack(pos, vel),
-                                                              (altitudeRatio - conf.Key) * conf.Value.transition);
+                        if (conf.Key <= altitudeRatio && (altitudeRatio - conf.Key) * conf.Value.transition > 1)
+                        {
+                            return Mathf.Rad2Deg * conf.Value.higher.GetAngleOfAttack(pos, vel);
+                        }
                     }
-                    
+                    return Mathf.Rad2Deg * DescentProfile.fetch.finalApproach.GetAngleOfAttack(pos, vel);
                 }
 
                 return null;
@@ -319,20 +364,19 @@ namespace Trajectories
                 {
                     double newvalue = Mathf.Deg2Rad * (double)value;
                     Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
+                    Vector3d vel = FlightGlobals.ActiveVessel.obt_velocity - Trajectory.Target.Body.getRFrmVel(Trajectory.Target.Body.position + pos);
                     double altitude = pos.magnitude - Trajectory.Target.Body.Radius;
                     double altitudeRatio = Trajectory.Target.Body.atmosphere ? altitude / Trajectory.Target.Body.atmosphereDepth : 0;
 
                     foreach (var conf in DescentProfile.fetch.NodeList)
                     {
-                        if (conf.Key <= altitudeRatio && conf.Value.higher != DescentProfile.fetch.entry)
+                        if (conf.Key <= altitudeRatio && (altitudeRatio - conf.Key) * conf.Value.transition > 1)
                         {
-                            conf.Value.higher.Angle = newvalue;
-                            if ((altitudeRatio - conf.Key)*conf.Value.transition < 1)
-                                conf.Value.lower.Angle = newvalue;
-                            //break;
+                            double delta = newvalue - conf.Value.higher.GetAngleOfAttack(pos, vel);
+                            conf.Value.higher.Angle += delta;
+                            break;
                         }
                     }
-
                 }
             }
         }
@@ -344,18 +388,30 @@ namespace Trajectories
         {
             if (FlightGlobals.ActiveVessel != null && Trajectory.Target.Body != null)
             {
-
                 Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
-                Vector3d vel = FlightGlobals.ActiveVessel.obt_velocity - Trajectory.Target.Body.getRFrmVel(Trajectory.Target.Body.position + pos);
                 double altitude = pos.magnitude - Trajectory.Target.Body.Radius;
                 double altitudeRatio = Trajectory.Target.Body.atmosphere ? altitude / Trajectory.Target.Body.atmosphereDepth : 0;
 
-                return DescentProfile.fetch.NodeList.Any(c => c.Value.higher == DescentProfile.fetch.entry && (altitudeRatio - c.Key)*c.Value.transition <= 1);
+                return DescentProfile.fetch.NodeList.Any(c => c.Value.higher == DescentProfile.fetch.entry && altitudeRatio < c.Key );
 
                 
             }
             else
                 return false; // neither true or false make sense, but failing condition is good idea
+        }
+
+        public static bool isTransitionAlt()
+        {
+            if (FlightGlobals.ActiveVessel != null && Trajectory.Target.Body != null)
+            {
+                Vector3d pos = FlightGlobals.ActiveVessel.GetWorldPos3D() - Trajectory.Target.Body.position;
+                double altitude = pos.magnitude - Trajectory.Target.Body.Radius;
+                double altitudeRatio = Trajectory.Target.Body.atmosphere ? altitude / Trajectory.Target.Body.atmosphereDepth : 0;
+
+                return DescentProfile.fetch.NodeList.Any(c => altitudeRatio >= c.Key && (altitudeRatio - c.Key) * c.Value.transition <= 1d);
+            }
+            else
+                return false;
         }
 
 

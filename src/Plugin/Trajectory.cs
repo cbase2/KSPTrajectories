@@ -321,7 +321,7 @@ namespace Trajectories
             Trajectories.Telemetry.AddChannel<double>("ut");
             Trajectories.Telemetry.AddChannel<double>("altitude");
             addVector("airVelocity");
-            Trajectories.Telemetry.AddChannel<double>("aoa");
+            Trajectories.Telemetry.AddChannel<float>("aoa");
 
             Trajectories.Telemetry.AddChannel<double>("density");
             //Telemetry.AddChannel<double>("density_calc");
@@ -383,8 +383,9 @@ namespace Trajectories
                     Transform vesselTransform = attachedVessel.ReferenceTransform;
 
                     Quaternion velocityRotation = Quaternion.LookRotation(-bodySpacePosition, airVelocity).Inverse();
-
-                    double AoA = Vector3.SignedAngle(vesselTransform.up, airVelocity, vesselTransform.right);
+                    
+                    float AoA = Vector3.SignedAngle(vesselTransform.up, airVelocity, vesselTransform.right);
+                    
                     VesselAerodynamicModel.DebugParts = true;
                     Vector3d predictedForce = aerodynamicModel_.ComputeForces( altitudeAboveSea, airVelocity, bodySpacePosition, AoA, applyScale: false );
                     VesselAerodynamicModel.DebugParts = false;
@@ -394,16 +395,16 @@ namespace Trajectories
 
                     Vector3 localActualForce = velocityRotation * ActualForce;
                     Vector3 localPredictedForce = velocityRotation * predictedForce;
-                    /*bool idleFlight = attachedVessel.ctrlState.mainThrottle == 0
+                    bool idleFlight = attachedVessel.ctrlState.mainThrottle == 0
                                         && attachedVessel.FindPartModulesImplementing<ModuleRCS>().Any(p => !p.rcs_active);
 
                     if (altitudeAboveSea < body.atmosphereDepth && idleFlight )
                     {
                         Vector3d newScale = Vector3d.one;
-                        //clamp correction factor depending on altitude: 1 at entry, and +-10% at half altitude
+                        //clamp correction factor depending on altitude: 1 at entry, and +-25% at half altitude
                         //this allows for better adaption close to ground while being stable at high altitudes
-                        double min = Util.dLerp(1d, 0.9d, 1d * altitudeAboveSea / body.atmosphereDepth);
-                        double max = Util.dLerp(1d, 1.1d, 1d * altitudeAboveSea / body.atmosphereDepth);
+                        double min = Util.dLerp(1d, 0.75d, 2d * altitudeAboveSea / body.atmosphereDepth);
+                        double max = Util.dLerp(1d, 1.25d, 2d * altitudeAboveSea / body.atmosphereDepth);
 
                         if (Math.Abs(localPredictedForce.x) > 0.1 )
                             newScale.x = Util.Clamp(localActualForce.x / localPredictedForce.x, min, max);
@@ -414,20 +415,20 @@ namespace Trajectories
 
                         // forces can jump somewhat so only move current factor slowly
                         Settings.fetch.GlobalCorrectionFactor = Vector3d.Lerp(Settings.fetch.GlobalCorrectionFactor, newScale, 0.05);
-                        //UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
+                        UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
                     }
                     else
                     {
                         Settings.fetch.GlobalCorrectionFactor = Vector3d.one;
                         //UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
-                    }*/
+                    }
 #if DEBUG && DEBUG_TELEMETRY
                     Trajectories.Telemetry.Send("ut", now);
                     Trajectories.Telemetry.Send("altitude", attachedVessel.altitude);
 
                     sendVector("airVelocity", velocityRotation * airVelocity);
 
-                    Trajectories.Telemetry.Send("aoa", (AoA * Mathf.Rad2Deg));
+                    Trajectories.Telemetry.Send("aoa", AoA);
 
                     // sendVector("force_total",velocityRotation * TotalForce);
                     sendVector("force_actual", localActualForce);
