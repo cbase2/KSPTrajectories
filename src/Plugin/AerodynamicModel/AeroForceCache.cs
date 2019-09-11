@@ -50,15 +50,15 @@ namespace Trajectories
         {
             float vFrac = (float)(velocity / VelocityResolution);
             int vFloor = (int)vFrac;
-            vFrac = Math.Min(1.0f, vFrac - (float)vFloor);
+            vFrac = Mathf.Clamp01(vFrac - (float)vFloor);
 
             float aFrac = (float)(angleOfAttack / AoAResolution);
-            int aFloor =  (int)aFrac;
-            aFrac = Math.Max(0.0f, Math.Min(1.0f, aFrac - (float)aFloor));
+            int aFloor = (int)aFrac;
+            aFrac = Mathf.Clamp01(aFrac - (float)aFloor);
 
             float mFrac = (float)(altitude / AltitudeResolution);
             int mFloor = (int)mFrac;
-            mFrac = Math.Max(0.0f, Math.Min(1.0f, mFrac - (float)mFloor));
+            mFrac = Mathf.Clamp01(mFrac - (float)mFloor);
 
             //if (Verbose)
             //{
