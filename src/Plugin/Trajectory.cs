@@ -263,6 +263,15 @@ namespace Trajectories
 
         public int ErrorCount { get { return errorCount_; } }
 
+        private Vector3d _globalCorrectionFactor = Vector3d.one;
+
+        public Vector3d GlobalCorrectionFactor
+        {
+            get { return _globalCorrectionFactor; }
+            //magic constants: 0.02 as weight for moving average. clamp at +-25%
+            set { _globalCorrectionFactor = Util.Clamp(Vector3d.Lerp(_globalCorrectionFactor, value, 0.02),0.75,1.25); }
+        }
+
         /// <summary>
         /// Trajectory calculation time in last frame
         /// </summary>
@@ -387,7 +396,7 @@ namespace Trajectories
                     float AoA = Vector3.SignedAngle(vesselTransform.up, airVelocity, vesselTransform.right);
                     
                     VesselAerodynamicModel.DebugParts = true;
-                    Vector3d predictedForce = aerodynamicModel_.ComputeForces( altitudeAboveSea, airVelocity, bodySpacePosition, AoA, applyScale: false );
+                    Vector3d predictedForce = aerodynamicModel_.ComputeForces( altitudeAboveSea, airVelocity, bodySpacePosition, AoA * Mathf.Deg2Rad, applyScale: false );
                     VesselAerodynamicModel.DebugParts = false;
                     //VesselAerodynamicModel.Verbose = true;
                     //Vector3d predictedForceWithCache = aerodynamicModel_.GetForces(body, bodySpacePosition, airVelocity, AoA);
@@ -396,32 +405,30 @@ namespace Trajectories
                     Vector3 localActualForce = velocityRotation * ActualForce;
                     Vector3 localPredictedForce = velocityRotation * predictedForce;
                     bool idleFlight = attachedVessel.ctrlState.mainThrottle == 0
-                                        && attachedVessel.FindPartModulesImplementing<ModuleRCS>().Any(p => !p.rcs_active);
+                                        && attachedVessel.FindPartModulesImplementing<ModuleRCS>().All(p => !p.rcs_active);
+
+                    //UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction if we are in idle flight: {0}", idleFlight));
 
                     if (altitudeAboveSea < body.atmosphereDepth && idleFlight )
                     {
                         Vector3d newScale = Vector3d.one;
-                        //clamp correction factor depending on altitude: 1 at entry, and +-25% at half altitude
-                        //this allows for better adaption close to ground while being stable at high altitudes
-                        double min = Util.dLerp(1d, 0.75d, 2d * altitudeAboveSea / body.atmosphereDepth);
-                        double max = Util.dLerp(1d, 1.25d, 2d * altitudeAboveSea / body.atmosphereDepth);
 
                         if (Math.Abs(localPredictedForce.x) > 0.1 )
-                            newScale.x = Util.Clamp(localActualForce.x / localPredictedForce.x, min, max);
+                            newScale.x = localActualForce.x / localPredictedForce.x;
                         if (Math.Abs(localPredictedForce.y) > 0.1 )
-                            newScale.y = Util.Clamp(localActualForce.y / localPredictedForce.y, min, max);
+                            newScale.y = localActualForce.y / localPredictedForce.y;
                         if (Math.Abs(localPredictedForce.z) > 0.1 )
-                            newScale.z = Util.Clamp(localActualForce.z / localPredictedForce.z, min, max);
+                            newScale.z = localActualForce.z / localPredictedForce.z;
 
-                        // forces can jump somewhat so only move current factor slowly
-                        Settings.fetch.GlobalCorrectionFactor = Vector3d.Lerp(Settings.fetch.GlobalCorrectionFactor, newScale, 0.05);
-                        UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
+                        // feed correction into Settings, internal calculation will smooth it
+                        GlobalCorrectionFactor = newScale;
+                        UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", GlobalCorrectionFactor));
                     }
-                    else
+                    /*else if (altitudeAboveSea > body.atmosphereDepth)
                     {
-                        Settings.fetch.GlobalCorrectionFactor = Vector3d.one;
-                        //UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
-                    }
+                        Settings.fetch.GlobalCorrectionFactor[density] = Vector3d.one;
+                        UnityEngine.Debug.Log(String.Format("Trajectories reseting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
+                    }*/
 #if DEBUG && DEBUG_TELEMETRY
                     Trajectories.Telemetry.Send("ut", now);
                     Trajectories.Telemetry.Send("altitude", attachedVessel.altitude);
@@ -1098,8 +1105,8 @@ namespace Trajectories
                         // For us,
                         // h is the time step of the outer simulation (KSP), which is the physics time step
                         // y''(t) is the difference of the velocity/acceleration divided by the physics time step
-                        state.position += 0.5 * TimeWarp.fixedDeltaTime * currentAccel * dt;
-                        state.velocity += 0.5 * TimeWarp.fixedDeltaTime * (currentAccel - lastAccel);
+                       state.position += 0.5 * TimeWarp.fixedDeltaTime * currentAccel * dt;
+                       state.velocity += 0.5 * TimeWarp.fixedDeltaTime * (currentAccel - lastAccel);
 
                         Profiler.Stop("IntegrationStep");
 
