@@ -321,17 +321,23 @@ namespace Trajectories
 
                         if (wing is ModuleControlSurface)
                         {
-                            // use reflections to access protected fields
-                            bool mcs_neutral = (Mathf.Abs((float)mcsDeflectionfield.GetValue(wing as ModuleControlSurface)) <= 0.01);
+                            // assume new KSP 1.8 deploy angle as average angle of control surface
+                            // 
+                            ModuleControlSurface mcs = wing as ModuleControlSurface;
 
-                            if (!mcs_neutral)
+                            if (mcs.deploy)
                             {
-                                Quaternion mcs_rot = (Quaternion)mcsAirflowIncidencefield.GetValue(wing as ModuleControlSurface);
+                                Quaternion mcs_rot = Quaternion.AngleAxis((mcs.deployInvert ^ mcs.mirrorDeploy ? 1f: -1f)*mcs.deployAngle, p.transform.right);
+                                
                                 liftVector = mcs_rot * liftVector;
-                            }
-
-                            liftdot = Vector3.Dot(sim_dragVectorDir, liftVector);
-                            absdot = Mathf.Abs(liftdot);
+                                liftdot = Vector3.Dot(sim_dragVectorDir, liftVector);
+                                absdot = Mathf.Abs(liftdot);
+                                /*if (v_wrld_vel.magnitude > 2100 && v_wrld_vel.magnitude < 2130)
+                                {
+                                    Debug.Log("Traj MCS " + mcs.part.name + " has " + mcs.deployAngle + " angle and orientation " + (mcs.deployInvert ^ mcs.mirrorDeploy ? " pos " : " neg "));
+                                    Debug.Log(String.Format("Traj MCS mcs_rot={0:F1}, part up={1:F2}, liftVector={2:F2}, sim_dragVectorDir={3:F2}", mcs_rot.eulerAngles, wing.transformSign * p.transform.forward, liftVector, sim_dragVectorDir));
+                                }*/
+                            }                        
 
                             local_lift = mcs_mod * Mathf.Sign(liftdot)
                                                     * wing.liftCurve.Evaluate(absdot)

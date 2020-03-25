@@ -213,15 +213,16 @@ namespace Trajectories
             // somehow we miss true forces by some percent, which seem pretty constant in local coordinates
             // so we simply apply correction factor computed by comparing current forces
             if (applyScale)
-                localForce = Vector3d.Scale(localForce, Settings.fetch.GlobalCorrectionFactor);
+                localForce = Vector3d.Scale(localForce, Trajectory.fetch.GlobalCorrectionFactor);
 
             Vector3d res = Quaternion.LookRotation(-vup, airVelocity) * localForce;
 
-            if (VesselAerodynamicModel.DebugParts)
+            /*if (applyScale==false)
             {
-                //Debug.Log(String.Format("Traj Debug Input local airVel={0:F1}, local airVelfixedAoA={1:F1}", (Vector3) airVelocity, vesselRotation.Inverse() * airVelocityForFixedAoA));
-                //Debug.Log(String.Format("Traj Debug Result local force={0:F1}, result force={1:F1}", vesselRotation.Inverse() * totalForce, (Vector3) res));
-            }
+                Debug.Log(String.Format("Traj Debug Input local airVel={0:F1}, local airVelfixedAoA={1:F1}", (Vector3) airVelocity, vesselRotation.Inverse() * airVelocityForFixedAoA));
+                Debug.Log(String.Format("Traj Debug Input angleOfAttack={0:F1}, aoaRotation={1:F1}, vesselRotation={2:F1}", angleOfAttack, aoaRotation.eulerAngles, vesselRotation.eulerAngles));
+                Debug.Log(String.Format("Traj Debug Result local force={0:F1}, result force={1:F1}", vesselRotation.Inverse() * totalForce, (Vector3) res));
+            }*/
 
             if (Double.IsNaN(res.x) || Double.IsNaN(res.y) || Double.IsNaN(res.z))
             {
