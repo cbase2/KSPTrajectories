@@ -109,6 +109,13 @@ namespace Trajectories
             return Math.Max(min, Math.Min(value, max));
         }
 
+        public static Vector3d Clamp(Vector3d value, Vector3d min, Vector3d max)
+        {
+            return new Vector3d(Math.Max(min.x, Math.Min(value.x, max.x)),
+                                Math.Max(min.y, Math.Min(value.y, max.y)),
+                                Math.Max(min.z, Math.Min(value.z, max.z)));
+        }
+
         public static double dLerp(double a, double b, double t)
         {
             return a + (b - a) * Clamp(t,0d,1d);
