@@ -258,7 +258,7 @@ namespace Trajectories
                 if ((FlightGlobals.ActiveVessel != null) && !DescentProfile.fetch.ProgradeEntry)
                 {
                     DescentProfile.fetch.RetrogradeEntry = false;
-                    DescentProfile.fetch.Reset(0);
+                    DescentProfile.fetch.Reset();
                     DescentProfile.fetch.Save();
                 }
             }
@@ -280,7 +280,7 @@ namespace Trajectories
                 if ((FlightGlobals.ActiveVessel != null) && !DescentProfile.fetch.RetrogradeEntry)
                 {
                     DescentProfile.fetch.RetrogradeEntry = true;
-                    DescentProfile.fetch.Reset(Math.PI);
+                    DescentProfile.fetch.Reset(true);
                     DescentProfile.fetch.Save();
                 }
             }

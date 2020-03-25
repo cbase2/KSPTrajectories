@@ -20,10 +20,10 @@
   along with Trajectories.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using KSP.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using KSP.Localization;
 using UnityEngine;
 
 namespace Trajectories
@@ -51,6 +51,7 @@ namespace Trajectories
                 }
             }
 
+            // Angle in radiant
             public double Angle
             {
                 get => angle;
@@ -76,8 +77,8 @@ namespace Trajectories
                 get => sliderPos;
                 set
                 {
-                    sliderPos = Mathf.Clamp(value, -1f, 1f);
-                    Angle = (fetch.RetrogradeEntry ? Math.PI : 0d ) + Math.Sign(value) * 0.5 * value * value * Math.PI; // This helps to have high precision near 0/180° while still allowing big angles
+                    sliderPos = Mathf.Clamp(value, -Mathf.PI * 0.5f, 0f);
+                    Angle = (fetch.RetrogradeEntry ? Math.PI : 0d ) +  value; 
                 }
             }
 
@@ -91,11 +92,12 @@ namespace Trajectories
             public void RefreshSliderPos()
             {
                 Debug.Log(string.Format("Setting slider for angle {0} with retrograde is {1}", Angle, fetch.RetrogradeEntry));
-                float position = (float)Math.Sqrt(Math.Abs(Angle - (fetch.RetrogradeEntry ? Math.PI : 0d) )*2 / Math.PI );
+                // pos is interval [-pi/2,0]
+                float position = (float) (Angle - (fetch.RetrogradeEntry ? Math.PI : 0d) );
                 Debug.Log("New sliderpos abs value is " + position);
-                if (Angle < (fetch.RetrogradeEntry ? Math.PI : 0d ))
+               /* if (Angle < (fetch.RetrogradeEntry ? Math.PI : 0d ))
                     SliderPos = -position;
-                else
+                else */
                     SliderPos = position;
             }
 
@@ -121,7 +123,7 @@ namespace Trajectories
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(new GUIContent(Name, Description), GUILayout.Width(45));
                 Horizon = GUILayout.Toggle(Horizon, new GUIContent(Horizon_txt, "AoA = Angle of Attack = angle relatively to the velocity vector.\nHoriz = angle relatively to the horizon."), GUILayout.Width(45));
-                SliderPos = GUILayout.HorizontalSlider(SliderPos, -1.0f, 1.0f, GUILayout.Width(90));
+                SliderPos = GUILayout.HorizontalSlider(SliderPos, -Mathf.PI * 0.5f, 0.0f, GUILayout.Width(90));
                 GUILayout.Label(Angle_txt, GUILayout.Width(42));
                 GUILayout.EndHorizontal();
             }
@@ -153,10 +155,7 @@ namespace Trajectories
         // Awake is called only once when the script instance is being loaded. Used in place of the constructor for initialization.
         private void Awake()
         {
-            if (Settings.fetch.DefaultDescentIsRetro)
-                Reset(Math.PI);
-            else
-                Reset(0d);
+            Reset(Settings.fetch.DefaultDescentIsRetro);
         }
 
         private void OnDestroy()
@@ -179,29 +178,26 @@ namespace Trajectories
             // stores connection between the different settings
             NodeList = new SortedList<double, (Node higher, Node lower, double transition)>(new revSort())
             {
-                { 0.55, (entry,        highAltitude,  40) }, // 0.55+1/40=0.575 -> 0.55 is transition interval
-                { 0.25, (highAltitude, lowAltitude,   20) }, // 0.25+1/20=0.3 -> 0.25
+                { 0.50, (entry,        highAltitude,  8) }, // 0.55+1/5=0.575 -> 0.55 is transition interval
+                { 0.25, (highAltitude, lowAltitude,   10) }, // 0.25+1/20=0.3 -> 0.25
                 { 0.05, (lowAltitude,  finalApproach, 20) }  // 0.05+1/20=0.1 -> 0.05
             };
         }
 
-        public void Reset(double AoA = 0)
+        public void Reset(bool retrograde = false)
         {
-            Debug.Log(string.Format("Resetting vessel descent profile to {0} degrees", AoA * Mathf.Rad2Deg));
-            
-            RetrogradeEntry = Math.Abs(AoA) > 0.5 * Math.PI;
+            Debug.Log(string.Format("Resetting vessel descent profile with option retrograde: ", retrograde));
 
-            /*AoA = AoA - (RetrogradeEntry ? Math.PI : 0d)*/;
+            RetrogradeEntry = retrograde;
 
-            entry.Angle = AoA;
-            entry.Horizon = false;
-            highAltitude.Angle = AoA;
-            highAltitude.Horizon = false;
-            lowAltitude.Angle = AoA;
-            lowAltitude.Horizon = false;
-            finalApproach.Angle = AoA;
-            finalApproach.Horizon = false;
+            double orientationAngle = retrograde ? Math.PI : 0d;
 
+            entry.Angle = orientationAngle - Math.PI/4; // 45 degree front up
+            highAltitude.Angle = orientationAngle - Math.PI/12; // 15 degree front up
+            lowAltitude.Angle = orientationAngle - Math.PI /18 ; // 10 degree front up
+            finalApproach.Angle = orientationAngle;
+
+            entry.Horizon = highAltitude.Horizon = lowAltitude.Horizon = finalApproach.Horizon = false;
 
             RefreshSliders();
         }
@@ -319,12 +315,12 @@ namespace Trajectories
 
             if (newPrograde && !ProgradeEntry)
             {
-                Reset(0d);
+                Reset();
                 Save();
             }
             else if (newRetrograde && !RetrogradeEntry)
             {
-                Reset(Math.PI);
+                Reset(true);
                 Save();
             }
         }
