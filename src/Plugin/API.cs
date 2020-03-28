@@ -321,8 +321,12 @@ namespace Trajectories
                             double delta = newvalue - Util.dLerp(conf.Value.lower.GetAngleOfAttack(pos, vel), conf.Value.higher.GetAngleOfAttack(pos, vel), factor );
                             Debug.Log("Traj API: newangle for "+ conf.Value.higher.Name +" with delta " + (Mathf.Rad2Deg * delta).ToString("F1")+" gives " + (Mathf.Rad2Deg * (conf.Value.higher.Angle + delta)).ToString("F1"));
                             conf.Value.higher.Angle += delta;
+                            conf.Value.higher.RefreshSliderPos();
                             if (factor < 1)
+                            {
                                 conf.Value.lower.Angle += delta;
+                                conf.Value.lower.RefreshSliderPos();
+                            }
                             break;
                         }
                     }

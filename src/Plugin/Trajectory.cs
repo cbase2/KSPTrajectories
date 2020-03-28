@@ -269,7 +269,7 @@ namespace Trajectories
         {
             get { return _globalCorrectionFactor; }
             //magic constants: 0.02 as weight for moving average. clamp at +-25%
-            set { _globalCorrectionFactor = Util.Clamp(Vector3d.Lerp(_globalCorrectionFactor, value, 0.02),0.75,1.25); }
+            set { _globalCorrectionFactor = Vector3d.Lerp(_globalCorrectionFactor, Util.Clamp(value, 0.75, 1.25), 0.001); }
         }
 
         /// <summary>
@@ -424,11 +424,11 @@ namespace Trajectories
                         GlobalCorrectionFactor = newScale;
                         UnityEngine.Debug.Log(String.Format("Trajectories adjusting global Correction to {0}", GlobalCorrectionFactor));
                     }
-                    /*else if (altitudeAboveSea > body.atmosphereDepth)
+                    else if (altitudeAboveSea > body.atmosphereDepth)
                     {
-                        Settings.fetch.GlobalCorrectionFactor[density] = Vector3d.one;
-                        UnityEngine.Debug.Log(String.Format("Trajectories reseting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
-                    }*/
+                        GlobalCorrectionFactor = Vector3d.one;
+                        //UnityEngine.Debug.Log(String.Format("Trajectories reseting global Correction to {0}", Settings.fetch.GlobalCorrectionFactor));
+                    }
 #if DEBUG && DEBUG_TELEMETRY
                     Trajectories.Telemetry.Send("ut", now);
                     Trajectories.Telemetry.Send("altitude", attachedVessel.altitude);

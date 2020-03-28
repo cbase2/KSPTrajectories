@@ -57,6 +57,10 @@ namespace Trajectories
                 get => angle;
                 set
                 {
+                    if (fetch.RetrogradeEntry)
+                        value = Util.Clamp(value, 0.5 * Math.PI, Math.PI);
+                    else
+                        value = Util.Clamp(value, -0.5 * Math.PI, 0);
                     if (Math.Abs(value) < 0.00001)
                         angle = 0d;
                     else
