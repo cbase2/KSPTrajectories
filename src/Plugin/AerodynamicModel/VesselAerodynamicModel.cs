@@ -81,9 +81,9 @@ namespace Trajectories
             Debug.Log("Trajectories: Initializing cache");
 
             // resolution = step size for true values, others are interpolated
-            int velocityResolution = 100; // m/s
-            int angleOfAttackResolution = 2; // degree, internal converted to radian
-            int altitudeResolution = 500; // m
+            int velocityResolution = 50; // m/s
+            int angleOfAttackResolution = 1; // degree, internal converted to radian
+            int altitudeResolution = 200; // m
 
             cachedForces = new AeroForceCache( velocityResolution, angleOfAttackResolution, altitudeResolution, this);
 

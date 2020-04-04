@@ -39,7 +39,7 @@ namespace Trajectories
             Model = model;
 
             VelocityResolution = vRes;
-            AoAResolution =  aoaRes * Math.PI / 90.0;
+            AoAResolution =  aoaRes * Mathf.Deg2Rad;
             AltitudeResolution = altRes;
             
             _cache = new Dictionary<(int, int, int), Vector2>();
@@ -96,14 +96,8 @@ namespace Trajectories
         {
 
             Vector2 f;
-            try
-            {
-                 _cache.TryGetValue((v, a, m), out f);
-            }
-            catch (KeyNotFoundException)
-            {
+            if (! _cache.TryGetValue((v, a, m), out f))
                 f = ComputeCacheEntry(v, a, m);
-            }
 
             return f;
         }
